@@ -325,7 +325,9 @@ function drawPara(str, x, y, size, color, o, maxW, leading) {
 // ---------------------------------------------------------------- palette & type styles
 
 const PAPER = '#f3eee4', CARD = '#fbf9f4', INK = '#141922', MUTED = '#454b57', RED = '#c3122f', NAVY = '#12223a', GOLD = '#e7b44c';
-const HEAD = (s) => ({ lw: s * 0.175, sx: 0.84 });
+// Headline strokes are heavy (0.2 of the size) so they survive the page being shown ~300 px wide;
+// the glyphs are condensed a little more to keep line widths, and so the wrapping, about the same.
+const HEAD = (s) => ({ lw: s * 0.2, sx: 0.8 });
 const BODY = (s) => ({ lw: Math.max(1.25, s * 0.125), sx: 0.86 });
 const KICK = (s) => ({ lw: Math.max(1.2, s * 0.14), sx: 0.9, track: 1.4 });
 
@@ -590,12 +592,12 @@ const LEAD = {
 };
 
 const STORIES = [
-  { art: icjArt, kicker: 'THE HAGUE', head: 'WORLD COURT: MYANMAR COMMITTED GENOCIDE', body: 'ICJ rules 9-6 on the Rohingya in a case brought by The Gambia; first time it finds a state guilty of genocide.' },
-  { art: ipoArt, kicker: 'NEW YORK', head: 'ANTHROPIC JUMPS 17% IN NASDAQ DEBUT', body: 'Biggest IPO ever raised $81.3BN at $83 a share; stock opens at $111.50, closes at $97.17.' },
-  { art: ukraineArt, kicker: 'BERLIN · KYIV', head: 'ALLIES URGE RUSSIA: WINTER ENERGY TRUCE', body: 'Berlin summit with Zelensky and US envoys; Putin rules out truce after Crimean Bridge strike. Drones hit Kyiv cathedral.' },
-  { art: riyadhArt, kicker: 'RIYADH', head: "HOUTHI ATTACK DAMAGES RIYADH'S TALLEST TOWER", body: 'Saudi wealth fund PIF tower hit, no injuries reported; Houthi media report Saudi air raids on Sanaa.' },
-  { art: copArt, kicker: 'ANTALYA · COP31', head: 'CLIMATE DRAFT DROPS FOSSIL FUEL LANGUAGE', body: 'New text at the UN talks in Turkey strips calls to move away from coal, oil and gas.' },
-  { art: hippoArt, kicker: 'COLOMBIA', head: "COLOMBIA TO PUT DOWN 10 OF ESCOBAR'S HIPPOS", body: "Four-month pilot cull of the invasive herd descended from the drug lord's private zoo." },
+  { art: icjArt, kicker: 'THE HAGUE', tag: 'ASIA · JUSTICE', head: 'WORLD COURT: MYANMAR COMMITTED GENOCIDE', body: 'ICJ rules 9-6 on the Rohingya in a case brought by The Gambia; first time it finds a state guilty of genocide.' },
+  { art: ipoArt, kicker: 'NEW YORK', tag: 'US · MARKETS', head: 'ANTHROPIC JUMPS 17% IN NASDAQ DEBUT', body: 'Biggest IPO ever raised $81.3BN at $83 a share; stock opens at $111.50, closes at $97.17.' },
+  { art: ukraineArt, kicker: 'BERLIN · KYIV', tag: 'EUROPE · WAR', head: 'ALLIES URGE RUSSIA: WINTER ENERGY TRUCE', body: 'Berlin summit with Zelensky and US envoys; Putin rules out truce after Crimean Bridge strike. Drones hit Kyiv cathedral.' },
+  { art: riyadhArt, kicker: 'RIYADH', tag: 'MIDDLE EAST · CONFLICT', head: "HOUTHI ATTACK DAMAGES RIYADH'S TALLEST TOWER", body: 'Saudi wealth fund PIF tower hit, no injuries reported; Houthi media report Saudi air raids on Sanaa.' },
+  { art: copArt, kicker: 'ANTALYA · COP31', tag: 'CLIMATE', head: 'CLIMATE DRAFT DROPS FOSSIL FUEL LANGUAGE', body: 'New text at the UN talks in Turkey strips calls to move away from coal, oil and gas.' },
+  { art: hippoArt, kicker: 'COLOMBIA', tag: 'AMERICAS · NATURE', head: "COLOMBIA TO PUT DOWN 10 OF ESCOBAR'S HIPPOS", body: "Four-month pilot cull of the invasive herd descended from the drug lord's private zoo." },
 ];
 
 const TICKER = [
@@ -641,6 +643,10 @@ function render() {
     s.art(cx, cy, cw, artH);
     drawText(s.kicker, cx + 12, cy + 129, 10.5, RED, KICK(10.5));
     drawBlock(s.head, s.body, cx + 12, cy + textTop, cw - 22, fit.hs, fit.bs);
+    // region and beat, right-aligned on the kicker line: the page's breadth readable at a glance
+    const tagO = Object.assign(KICK(9.5), { align: 'right' });
+    if (measure(s.kicker, 10.5, KICK(10.5)) + 24 + measure(s.tag, 9.5, tagO) > cw - 22) throw new Error('tag crowds its kicker: ' + s.tag);
+    drawText(s.tag, cx + cw - 10, cy + 130, 9.5, '#8a8f99', tagO);
   });
 
   // ticker of further stories
