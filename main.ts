@@ -543,16 +543,18 @@ function copArt(x, y, w, h) {
   fillPoly([[[gx + 12, gy - 6], [gx + 34, gy - 20], [gx + 42, gy + 6], [gx + 26, gy + 30], [gx + 14, gy + 16]]], '#4caf50');
   setClip(x, y, w, h);
   // draft text document
-  const dx = x + 22, dy = y + 12, dw = w * 0.6, dh = h - 4;
+  const dx = x + 18, dy = y + 10, dw = w * 0.64, dh = h - 2;
   fillRect(dx + 4, dy + 4, dw, dh, '#000000', 0.15);
   fillRect(dx, dy, dw, dh, '#ffffff');
-  drawText('COP31 DRAFT DEAL', dx + 10, dy + 10, 10, INK, { lw: 1.7, sx: 0.88 });
-  for (let i = 0; i < 3; i++) line(dx + 10, dy + 32 + i * 10, dx + dw - 12 - (i % 2) * 30, dy + 32 + i * 10, 3, '#c7ccd4');
-  fillRect(dx + 7, dy + 61, dw - 14, 18, '#ffe9a8');
-  drawText('TRANSITION AWAY FROM', dx + 10, dy + 63, 6.2, INK, { lw: 1.1, sx: 0.88 });
-  drawText('FOSSIL FUELS', dx + 10, dy + 72, 6.2, INK, { lw: 1.1, sx: 0.88 });
-  line(dx + 6, dy + 68, dx + dw - 8, dy + 74, 2.4, RED);
-  for (let i = 0; i < 3; i++) line(dx + 10, dy + 90 + i * 10, dx + dw - 14 - ((i + 1) % 2) * 26, dy + 90 + i * 10, 3, '#c7ccd4');
+  drawText('COP31 DRAFT DEAL', dx + 10, dy + 9, 10, INK, { lw: 1.7, sx: 0.88 });
+  for (let i = 0; i < 2; i++) line(dx + 10, dy + 30 + i * 9, dx + dw - 12 - (i % 2) * 30, dy + 30 + i * 9, 3, '#c7ccd4');
+  // the deleted words, highlighted and struck through
+  fillRect(dx + 6, dy + 46, dw - 12, 34, '#ffe9a8');
+  drawText('TRANSITION AWAY FROM', dx + 11, dy + 50, 9, INK, { lw: 1.5, sx: 0.84 });
+  drawText('FOSSIL FUELS', dx + 11, dy + 65, 11, INK, { lw: 2, sx: 0.84 });
+  line(dx + 8, dy + 54.5, dx + 11 + measure('TRANSITION AWAY FROM', 9, { lw: 1.5, sx: 0.84 }) + 3, dy + 54.5, 2.2, RED);
+  line(dx + 8, dy + 70.5, dx + 11 + measure('FOSSIL FUELS', 11, { lw: 2, sx: 0.84 }) + 3, dy + 70.5, 2.6, RED);
+  for (let i = 0; i < 3; i++) line(dx + 10, dy + 90 + i * 9, dx + dw - 14 - ((i + 1) % 2) * 26, dy + 90 + i * 9, 3, '#c7ccd4');
   resetClip();
 }
 
@@ -590,7 +592,7 @@ const LEAD = {
 const STORIES = [
   { art: icjArt, kicker: 'THE HAGUE', head: 'WORLD COURT: MYANMAR COMMITTED GENOCIDE', body: 'ICJ rules 9-6 on the Rohingya in a case brought by The Gambia; first time it finds a state guilty of genocide.' },
   { art: ipoArt, kicker: 'NEW YORK', head: 'ANTHROPIC JUMPS 17% IN NASDAQ DEBUT', body: 'Biggest IPO ever raised $81.3BN at $83 a share; stock opens at $111.50, closes at $97.17.' },
-  { art: ukraineArt, kicker: 'BERLIN · KYIV', head: 'ALLIES URGE RUSSIA TO ACCEPT WINTER ENERGY TRUCE', body: 'Putin refuses after Crimean Bridge strike; drones hit Kyiv cathedral, embassies.' },
+  { art: ukraineArt, kicker: 'BERLIN · KYIV', head: 'ALLIES URGE RUSSIA: WINTER ENERGY TRUCE', body: 'Berlin summit with Zelensky and US envoys; Putin rules out truce after Crimean Bridge strike. Drones hit Kyiv cathedral.' },
   { art: riyadhArt, kicker: 'RIYADH', head: "HOUTHI ATTACK DAMAGES RIYADH'S TALLEST TOWER", body: 'Saudi wealth fund PIF tower hit, no injuries reported; Houthi media report Saudi air raids on Sanaa.' },
   { art: copArt, kicker: 'ANTALYA · COP31', head: 'CLIMATE DRAFT DROPS FOSSIL FUEL LANGUAGE', body: 'New text at the UN talks in Turkey strips calls to move away from coal, oil and gas.' },
   { art: hippoArt, kicker: 'COLOMBIA', head: "COLOMBIA TO PUT DOWN 10 OF ESCOBAR'S HIPPOS", body: "Four-month pilot cull of the invasive herd descended from the drug lord's private zoo." },
@@ -632,6 +634,7 @@ function render() {
   const gap = 10, gy = ly + lh + gap;
   const cw = (W - 2 * M - 2 * gap) / 3, ch = 280, artH = 118, textTop = 148;
   const fit = chooseSizes(STORIES, cw - 22, ch - 8 - textTop, [20, 19, 18, 17, 16], [11.5, 11, 10.5, 10]);
+  console.log('card type: headline ' + fit.hs + 'px, body ' + fit.bs + 'px; lead: headline ' + lead.hs + 'px, body ' + lead.bs + 'px');
   STORIES.forEach((s, i) => {
     const cx = M + (i % 3) * (cw + gap), cy = gy + Math.floor(i / 3) * (ch + gap);
     card(cx, cy, cw, ch);
@@ -665,10 +668,11 @@ function blockHeight(head, body, w, hs, bs) {
   const bl = wrap(body, bs, BODY(bs), w).length;
   return hl * hs * 1.3 + 11 + bl * bs * 1.45 - bs * 0.45;
 }
-// The largest headline size (then body size) at which every story's block fits in `avail` pixels.
+// The largest headline size (then the largest body size) at which every story's block fits in `avail` pixels.
+// Headlines win: they are what a reader sees first and what must survive being shown small.
 function chooseSizes(stories, w, avail, headSizes, bodySizes) {
-  for (const bs of bodySizes) {
-    for (const hs of headSizes) {
+  for (const hs of headSizes) {
+    for (const bs of bodySizes) {
       if (stories.every(s => blockHeight(s.head, s.body, w, hs, bs) <= avail)) return { hs, bs };
     }
   }
