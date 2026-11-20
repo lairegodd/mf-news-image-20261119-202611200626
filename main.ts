@@ -11,7 +11,7 @@
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { TICKER, drawTicker } from './ticker.ts';
+import { REGIONS, BRIEF_COUNT, drawBriefs } from './briefs.ts';
 
 const W = 1024;
 const H = 1024;
@@ -24,8 +24,16 @@ function rgb(hex) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+// An optional uniform view transform (scale s, then offset ox/oy) applied to every shape, stroke and clip,
+// so an illustration designed at one size can be drawn smaller without being redrawn.
+let VIEW = null;
+function withView(s, ox, oy, fn) { VIEW = { s, ox, oy }; try { fn(); } finally { VIEW = null; resetClip(); } }
+const vx = (x) => VIEW ? VIEW.ox + x * VIEW.s : x;
+const vy = (y) => VIEW ? VIEW.oy + y * VIEW.s : y;
+
 let clip = { x0: 0, y0: 0, x1: W, y1: H };
 function setClip(x, y, w, h) {
+  if (VIEW) { x = vx(x); y = vy(y); w *= VIEW.s; h *= VIEW.s; }
   clip = { x0: Math.max(0, Math.floor(x)), y0: Math.max(0, Math.floor(y)), x1: Math.min(W, Math.ceil(x + w)), y1: Math.min(H, Math.ceil(y + h)) };
 }
 function resetClip() { clip = { x0: 0, y0: 0, x1: W, y1: H }; }
@@ -43,6 +51,7 @@ function blend(x, y, c, a) {
 
 function fillPoly(rings, color, alpha) {
   if (alpha === undefined) alpha = 1;
+  if (VIEW) rings = rings.map(r => r.map(p => [vx(p[0]), vy(p[1])]));
   const c = typeof color === 'string' ? rgb(color) : color;
   const edges = [];
   let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
@@ -145,6 +154,7 @@ function rotate(pts, cx, cy, ang) {
 }
 
 function vgrad(x, y, w, h, c1, c2) {
+  if (VIEW) { const v = VIEW; VIEW = null; vgrad(v.ox + x * v.s, v.oy + y * v.s, w * v.s, h * v.s, c1, c2); VIEW = v; return; }
   const a = rgb(c1), b = rgb(c2);
   const ys = Math.max(clip.y0, Math.floor(y)), ye = Math.min(clip.y1, Math.ceil(y + h));
   for (let yy = ys; yy < ye; yy++) {
@@ -158,6 +168,7 @@ function vgrad(x, y, w, h, c1, c2) {
 
 function strokeLines(lines, lw, color, alpha) {
   if (alpha === undefined) alpha = 1;
+  if (VIEW) { lines = lines.map(pl => pl.map(p => [vx(p[0]), vy(p[1])])); lw *= VIEW.s; }
   const c = typeof color === 'string' ? rgb(color) : color;
   const segs = [];
   let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
@@ -355,6 +366,10 @@ function flagRU(x, y, w, h) {
 function flagUA(x, y, w, h) { fillRect(x, y, w, h / 2, '#0057b7'); fillRect(x, y + h / 2, w, h / 2, '#ffd700'); }
 function flagCO(x, y, w, h) { fillRect(x, y, w, h / 2, '#fcd116'); fillRect(x, y + h / 2, w, h / 4, '#003893'); fillRect(x, y + 3 * h / 4, w, h / 4, '#ce1126'); }
 function flagSA(x, y, w, h) { fillRect(x, y, w, h, '#006c35'); line(x + w * 0.2, y + h * 0.42, x + w * 0.8, y + h * 0.42, h * 0.08, '#ffffff'); line(x + w * 0.25, y + h * 0.7, x + w * 0.75, y + h * 0.7, h * 0.05, '#ffffff'); }
+function flagIN(x, y, w, h) {
+  fillRect(x, y, w, h / 3, '#ff9933'); fillRect(x, y + h / 3, w, h / 3, '#ffffff'); fillRect(x, y + 2 * h / 3, w, h / 3, '#138808');
+  fillPoly([ellipse(x + w / 2, y + h / 2, h / 7, h / 7), ellipse(x + w / 2, y + h / 2, h / 11, h / 11).reverse()], '#000080');
+}
 
 function person(cx, baseY, scale, tie, hair) {
   const s = scale;
@@ -513,7 +528,7 @@ function riyadhArt(x, y, w, h) {
   vgrad(x, y, w, h, '#0f1836', '#5a3d62');
   const g = y + h - 12;
   // skyline of the King Abdullah Financial District
-  const towers = [[8, 40, 28], [40, 58, 24], [68, 34, 30], [102, 50, 26], [200, 62, 28], [232, 42, 30], [266, 70, 24], [294, 46, 28]];
+  const towers = [[8, 40, 28], [40, 58, 24], [68, 34, 30], [102, 50, 26], [200, 62, 28], [232, 42, 30], [266, 70, 24], [294, 46, 28], [328, 56, 26], [360, 38, 30], [394, 64, 24], [424, 46, 30], [458, 54, 26]];
   for (const [ox, th, tw] of towers) {
     fillRect(x + ox, g - th, tw, th + 2, '#2c2f58');
     for (let k = 8; k < th - 4; k += 9) fillRect(x + ox + 5, g - k, tw - 10, 2, '#f3d27a', 0.18);
@@ -561,26 +576,36 @@ function copArt(x, y, w, h) {
   resetClip();
 }
 
-function hippoArt(x, y, w, h) {
+// Cyclone Akvan seen from orbit over the Bay of Bengal, heading for the Odisha coast at Gopalpur.
+function cycloneArt(x, y, w, h) {
   setClip(x, y, w, h);
-  vgrad(x, y, w, h * 0.5, '#bfe3f2', '#e6f3e2');
-  fillPoly([[[x, y + h * 0.42], [x + w * 0.3, y + h * 0.34], [x + w * 0.6, y + h * 0.4], [x + w, y + h * 0.33], [x + w, y + h * 0.6], [x, y + h * 0.6]]], '#4f8a3a');
-  vgrad(x, y + h * 0.55, w, h * 0.45, '#5a8fa8', '#3b6f86');
-  // hippo, half submerged
-  const hx = x + w * 0.5, hy = y + h * 0.68;
-  setClip(x, y, w, h * 0.72);
-  fillEllipse(hx - 30, hy + 2, 58, 30, '#7b6f80');
-  fillEllipse(hx + 34, hy - 6, 34, 24, '#857888');
-  fillEllipse(hx + 52, hy + 2, 24, 18, '#8d8090');
-  fillEllipse(hx + 18, hy - 30, 6, 8, '#6d6272');
-  fillEllipse(hx + 40, hy - 30, 6, 8, '#6d6272');
-  fillCircle(hx + 28, hy - 16, 4, '#ffffff');
-  fillCircle(hx + 29, hy - 16, 2.2, '#111');
-  fillEllipse(hx + 58, hy - 6, 3, 2, '#3d3440');
-  fillEllipse(hx + 68, hy - 4, 3, 2, '#3d3440');
-  setClip(x, y, w, h);
-  for (let i = 0; i < 4; i++) line(hx - 80 + i * 40, y + h * 0.74 + (i % 2) * 6, hx - 56 + i * 40, y + h * 0.74 + (i % 2) * 6, 2, '#ffffff', 0.5);
-  flagCO(x + 12, y + 10, 34, 22);
+  vgrad(x, y, w, h, '#123a63', '#0b2440');
+  // India's east coast, top-left
+  fillPoly([[[x, y], [x + w * 0.5, y], [x + w * 0.44, y + h * 0.14], [x + w * 0.36, y + h * 0.3], [x + w * 0.27, y + h * 0.52], [x + w * 0.19, y + h * 0.76], [x + w * 0.13, y + h], [x, y + h]]], '#6f8f4e');
+  fillPoly([[[x, y], [x + w * 0.3, y], [x + w * 0.24, y + h * 0.4], [x + w * 0.12, y + h], [x, y + h]]], '#5e7d40');
+  // the storm: a white cloud disc with four spiral arms and a dark eye
+  const cx = x + w * 0.64, cy = y + h * 0.56;
+  fillCircle(cx, cy, 46, '#ffffff', 0.16);
+  fillCircle(cx, cy, 30, '#ffffff', 0.22);
+  for (let k = 0; k < 4; k++) {
+    const pts = [];
+    for (let t = 0; t <= 1.0001; t += 0.04) {
+      const a = k * Math.PI / 2 - t * 4.4, r = 6 + t * 54;
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a) * 0.9]);
+    }
+    strokeLines([pts], 9, '#ffffff', 0.35);
+    strokeLines([pts], 4, '#ffffff', 0.85);
+  }
+  fillCircle(cx, cy, 6, '#0b2440');
+  // forecast track to landfall
+  const lx = x + w * 0.37, ly = y + h * 0.27;
+  for (let t = 0.12; t < 0.86; t += 0.11) line(cx + (lx - cx) * t, cy + (ly - cy) * t, cx + (lx - cx) * (t + 0.05), cy + (ly - cy) * (t + 0.05), 2.4, '#ffd25a');
+  fillCircle(lx, ly, 5, RED);
+  fillCircle(lx, ly, 2, '#ffffff');
+  drawText('GOPALPUR', lx - 8, ly - 4, 10, '#ffffff', { lw: 1.7, sx: 0.88, align: 'right' });
+  drawText('LANDFALL DUE 20 NOV', lx - 8, ly + 9, 8.5, '#ffd25a', { lw: 1.4, sx: 0.88, align: 'right' });
+  drawText('BAY OF BENGAL', x + w - 14, y + h - 16, 9, '#9fc3e6', { lw: 1.4, sx: 0.9, track: 1.5, align: 'right' });
+  flagIN(x + w - 46, y + 10, 34, 22);
   resetClip();
 }
 
@@ -589,65 +614,68 @@ function hippoArt(x, y, w, h) {
 const LEAD = {
   kicker: 'SHENZHEN, CHINA · APEC SUMMIT',
   head: 'TRUMP, XI AND PUTIN HOLD FIRST-EVER THREE-WAY SUMMIT',
-  body: 'US, Chinese and Russian leaders meet on the APEC sidelines; Xi warns a nuclear war "cannot be won and must never be fought". Ukraine, Iran and trade on the table.',
+  body: 'Their 90-minute meeting on the APEC sidelines ends in a four-point "Declaration Towards Peace": talks on nuclear risk, more refined oil, UN reform and limits on the ICC.',
 };
 
 const STORIES = [
-  { art: icjArt, kicker: 'THE HAGUE', tag: 'ASIA · JUSTICE', head: 'WORLD COURT: MYANMAR COMMITTED GENOCIDE', body: 'ICJ rules 9-6 on the Rohingya in a case brought by The Gambia; first time it finds a state guilty of genocide.' },
-  { art: ipoArt, kicker: 'NEW YORK', tag: 'US · MARKETS', head: 'ANTHROPIC JUMPS 17% IN NASDAQ DEBUT', body: 'Biggest IPO ever raised $81.3BN at $83 a share; stock opens at $111.50, closes at $97.17.' },
-  { art: ukraineArt, kicker: 'BERLIN · KYIV', tag: 'EUROPE · WAR', head: 'ALLIES URGE RUSSIA: WINTER ENERGY TRUCE', body: 'Berlin summit with Zelensky and US envoys; Putin rules out truce after Crimean Bridge strike. Drones hit Kyiv cathedral.' },
-  { art: riyadhArt, kicker: 'RIYADH', tag: 'MIDDLE EAST · CONFLICT', head: "HOUTHI ATTACK DAMAGES RIYADH'S TALLEST TOWER", body: 'Saudi wealth fund PIF tower hit, no injuries reported; Houthi media report Saudi air raids on Sanaa.' },
-  { art: copArt, kicker: 'ANTALYA · COP31', tag: 'CLIMATE', head: 'CLIMATE DRAFT DROPS FOSSIL FUEL LANGUAGE', body: 'New text at the UN talks in Turkey strips calls to move away from coal, oil and gas.' },
-  { art: hippoArt, kicker: 'COLOMBIA', tag: 'AMERICAS · NATURE', head: "COLOMBIA TO PUT DOWN 10 OF ESCOBAR'S HIPPOS", body: "Four-month pilot cull of the invasive herd descended from the drug lord's private zoo." },
+  { art: icjArt, kicker: 'THE HAGUE', tag: 'ASIA · JUSTICE', head: 'WORLD COURT: MYANMAR COMMITTED GENOCIDE', body: 'First time the court finds a state guilty; Rohingya case brought by The Gambia.' },
+  { art: ipoArt, kicker: 'NEW YORK', tag: 'US · MARKETS', head: 'ANTHROPIC JUMPS 17% IN NASDAQ DEBUT', body: 'Biggest IPO ever, priced at $83: opens at $111.50 and closes at $97.17.' },
+  { art: ukraineArt, kicker: 'BERLIN · KYIV', tag: 'EUROPE · WAR', head: 'ALLIES URGE RUSSIA: WINTER ENERGY TRUCE', body: 'Berlin summit rejects a "Yalta 2.0"; Putin rules out a truce. Kyiv cathedral hit.' },
+  { art: riyadhArt, kicker: 'RIYADH', tag: 'MIDDLE EAST · WAR', head: "HOUTHIS HIT RIYADH'S TALLEST TOWER", body: 'PIF tower damaged, no injuries; Houthis claim four strikes on Saudi sites.' },
+  { art: copArt, kicker: 'ANTALYA · COP31', tag: 'CLIMATE', head: 'CLIMATE DRAFT DROPS FOSSIL FUEL LANGUAGE', body: 'New UN text strips the call to move away from coal, oil and gas.' },
+  { art: cycloneArt, kicker: 'ODISHA, INDIA', tag: 'ASIA · DISASTER', head: 'CYCLONE AKVAN: 100,000 EVACUATED', body: 'Severe storm due ashore near Gopalpur on 20 Nov; rescue teams deployed.' },
 ];
 
 // ---------------------------------------------------------------- page layout
 
 function render() {
   fillRect(0, 0, W, H, PAPER);
+  const total = 1 + STORIES.length + BRIEF_COUNT;
 
-  // masthead
-  fillRect(0, 0, W, 112, NAVY);
-  drawText('THE WORLD IN ONE PICTURE', 24, 15, 12, GOLD, KICK(12));
-  drawText("THE DAY'S WORLD NEWS", W - 24, 15, 12, '#9fb0c6', Object.assign(KICK(12), { align: 'right' }));
+  // masthead: the day, and what the page covers
+  fillRect(0, 0, W, 80, NAVY);
+  drawText('THE WORLD IN ONE PICTURE', 20, 11, 11, GOLD, KICK(11));
+  drawText(total + ' STORIES · ' + (REGIONS.length - 1) + ' REGIONS · ALL FROM THIS ONE DAY', W - 20, 11, 11, '#c9d4e4', Object.assign(KICK(11), { align: 'right' }));
   const date = 'THURSDAY 19 NOVEMBER 2026';
-  let ds = 46;
+  let ds = 44;
   const dO = { lw: 6.4, sx: 0.86 };
-  while (measure(date, ds, dO) > W - 48) { ds -= 1; dO.lw = ds * 0.14; }
-  drawText(date, W / 2, 38, ds, '#ffffff', Object.assign(dO, { align: 'center' }));
-  fillRect(0, 112, W, 5, RED);
+  while (measure(date, ds, dO) > W - 40) { ds -= 1; dO.lw = ds * 0.14; }
+  drawText(date, W / 2, 27, ds, '#ffffff', Object.assign(dO, { align: 'center' }));
+  fillRect(0, 80, W, 4, RED);
 
-  const M = 14;
-  // lead story
-  const ly = 125, lh = 250;
+  const M = 12;
+  // lead story: the art is drawn at its design size (250 high) and scaled into the card
+  const ly = 90, lh = 180, leadW = 420;
   card(M, ly, W - 2 * M, lh);
-  leadArt(M, ly, 500, lh);
-  const tx = M + 516, tw = W - M - 14 - tx;
-  drawText(LEAD.kicker, tx, ly + 18, 12, RED, KICK(12));
-  const lead = chooseSizes([LEAD], tw, ly + lh - 12 - (ly + 42), [30, 28, 26, 24], [13.5, 13, 12.5, 12]);
-  drawBlock(LEAD.head, LEAD.body, tx, ly + 42, tw, lead.hs, lead.bs);
+  const ls = lh / 250;
+  withView(ls, M, ly, () => leadArt(0, 0, leadW / ls, 250));
+  const tx = M + leadW + 16, tw = W - M - 12 - tx;
+  drawText(LEAD.kicker, tx, ly + 14, 11.5, RED, KICK(11.5));
+  const lead = chooseSizes([LEAD], tw, ly + lh - 10 - (ly + 34), [28, 27, 26, 25, 24, 23, 22], [12.5, 12, 11.5, 11]);
+  drawBlock(LEAD.head, LEAD.body, tx, ly + 34, tw, lead.hs, lead.bs);
 
   // six-story grid: one headline size and one body size for every card, the largest that fits them all
-  const gap = 10, gy = ly + lh + gap;
-  const cw = (W - 2 * M - 2 * gap) / 3, ch = 280, artH = 118, textTop = 148;
-  const fit = chooseSizes(STORIES, cw - 22, ch - 8 - textTop, [20, 19, 18, 17, 16], [11.5, 11, 10.5, 10]);
+  const gap = 8, gy = ly + lh + gap;
+  const cw = (W - 2 * M - 2 * gap) / 3, ch = 200, artH = 82, textTop = artH + 30;
+  const as = artH / 118;
+  const fit = chooseSizes(STORIES, cw - 22, ch - 6 - textTop, [18, 17, 16.5, 16, 15.5, 15], [10.5, 10, 9.5]);
   console.log('card type: headline ' + fit.hs + 'px, body ' + fit.bs + 'px; lead: headline ' + lead.hs + 'px, body ' + lead.bs + 'px');
   STORIES.forEach((s, i) => {
     const cx = M + (i % 3) * (cw + gap), cy = gy + Math.floor(i / 3) * (ch + gap);
     card(cx, cy, cw, ch);
-    s.art(cx, cy, cw, artH);
-    drawText(s.kicker, cx + 12, cy + 129, 10.5, RED, KICK(10.5));
+    withView(as, cx, cy, () => s.art(0, 0, cw / as, 118));
+    drawText(s.kicker, cx + 12, cy + artH + 10, 10, RED, KICK(10));
     drawBlock(s.head, s.body, cx + 12, cy + textTop, cw - 22, fit.hs, fit.bs);
     // region and beat, right-aligned on the kicker line: the page's breadth readable at a glance
-    const tagO = Object.assign(KICK(9.5), { align: 'right' });
-    if (measure(s.kicker, 10.5, KICK(10.5)) + 24 + measure(s.tag, 9.5, tagO) > cw - 22) throw new Error('tag crowds its kicker: ' + s.tag);
-    drawText(s.tag, cx + cw - 10, cy + 130, 9.5, '#8a8f99', tagO);
+    const tagO = Object.assign(KICK(9), { align: 'right' });
+    if (measure(s.kicker, 10, KICK(10)) + 24 + measure(s.tag, 9, tagO) > cw - 22) throw new Error('tag crowds its kicker: ' + s.tag);
+    drawText(s.tag, cx + cw - 10, cy + artH + 11, 9, '#7d838e', tagO);
   });
 
-  // ticker of further stories, each with its dateline (ticker.ts)
-  const ty = gy + 2 * ch + gap + 7;
-  const tickS = drawTicker({ fillRect, fillCircle, drawText, measure, KICK, BODY, NAVY, RED, GOLD }, TICKER, 0, ty, W, H - ty, M, '19 NOV');
-  console.log('ticker type: ' + tickS + 'px');
+  // the rest of the day, region by region (briefs.ts)
+  const by = gy + 2 * ch + gap + gap;
+  const bs = drawBriefs({ fillRect, drawText, measure, KICK, BODY, INK, NAVY, GOLD, CARD }, M, by, W - 2 * M, H - M + 4 - by);
+  console.log('briefs: ' + BRIEF_COUNT + ' at ' + bs + 'px; ' + total + ' stories on the page');
 }
 
 function card(x, y, w, h) {
@@ -669,7 +697,9 @@ function chooseSizes(stories, w, avail, headSizes, bodySizes) {
       if (stories.every(s => blockHeight(s.head, s.body, w, hs, bs) <= avail)) return { hs, bs };
     }
   }
-  throw new Error('copy does not fit at any size');
+  const hs = headSizes[headSizes.length - 1], bs = bodySizes[bodySizes.length - 1];
+  const over = stories.filter(s => blockHeight(s.head, s.body, w, hs, bs) > avail).map(s => s.head + ' (' + blockHeight(s.head, s.body, w, hs, bs).toFixed(1) + ' > ' + avail + ')');
+  throw new Error('copy does not fit at any size: ' + over.join('; '));
 }
 function drawBlock(head, body, x, y, w, hs, bs) {
   const end = drawPara(head, x, y, hs, INK, HEAD(hs), w, hs * 1.3);
