@@ -11,6 +11,7 @@
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { TICKER, drawTicker } from './ticker.ts';
 
 const W = 1024;
 const H = 1024;
@@ -600,12 +601,6 @@ const STORIES = [
   { art: hippoArt, kicker: 'COLOMBIA', tag: 'AMERICAS · NATURE', head: "COLOMBIA TO PUT DOWN 10 OF ESCOBAR'S HIPPOS", body: "Four-month pilot cull of the invasive herd descended from the drug lord's private zoo." },
 ];
 
-const TICKER = [
-  'IAEA: US, UK, FRANCE AND GERMANY PRESS IRAN TO LET INSPECTORS BACK INTO BOMBED NUCLEAR SITES',
-  "CHINA CURBS EXPORTS OF DRONE ENGINES USED IN RUSSIA'S GERAN ATTACK DRONES",
-  "TRUMP ASKS SUPREME COURT, FOR A THIRD TIME, TO END VENEZUELANS' TPS PROTECTIONS",
-];
-
 // ---------------------------------------------------------------- page layout
 
 function render() {
@@ -649,18 +644,10 @@ function render() {
     drawText(s.tag, cx + cw - 10, cy + 130, 9.5, '#8a8f99', tagO);
   });
 
-  // ticker of further stories
+  // ticker of further stories, each with its dateline (ticker.ts)
   const ty = gy + 2 * ch + gap + 7;
-  fillRect(0, ty, W, H - ty, NAVY);
-  fillRect(M, ty + 9, 96, H - ty - 18, RED);
-  drawText('ALSO ON', M + 48, ty + 17, 11, '#ffffff', Object.assign(KICK(11), { align: 'center' }));
-  drawText('19 NOV', M + 48, ty + 34, 11, '#ffffff', Object.assign(KICK(11), { align: 'center' }));
-  let ts = 10.5;
-  while (TICKER.some(t => measure(t, ts, BODY(ts)) > W - M - 128 - 12)) ts -= 0.25;
-  TICKER.forEach((t, i) => {
-    fillCircle(M + 118, ty + 15 + i * 16.5, 2.6, GOLD);
-    drawText(t, M + 128, ty + 10 + i * 16.5, ts, '#ffffff', BODY(ts));
-  });
+  const tickS = drawTicker({ fillRect, fillCircle, drawText, measure, KICK, BODY, NAVY, RED, GOLD }, TICKER, 0, ty, W, H - ty, M, '19 NOV');
+  console.log('ticker type: ' + tickS + 'px');
 }
 
 function card(x, y, w, h) {
