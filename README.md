@@ -6,6 +6,8 @@
 
 A one-page front page of the world's news on **Thursday 19 November 2026**, drawn entirely from code. `main.ts` (Node 22, standard library only) renders a 1024×1024 PNG with its own anti-aliased polygon rasterizer, a hand-made stroke font, vector illustrations and a small PNG encoder. There are no image assets, no clock, no randomness and no network, so every run writes the same bytes.
 
+`ticker.ts` holds the "Also on 19 Nov" band at the foot of the page (each brief led by its dateline); `main.ts` imports it and hands it the page's drawing primitives.
+
 The page carries a lead story, six illustrated stories and a ticker, each sourced to reports from that day:
 
 - **Shenzhen:** Trump, Xi and Putin hold the first-ever US–China–Russia leaders' meeting at APEC
